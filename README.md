@@ -24,16 +24,16 @@ The system follows a serverless, microservices-based architecture with five key 
 5. Policy Enforcement and Monitoring
 
 Technology Stack:
-Amazon Cognito:	Identity management and Authentication
-Amazon API Gateway:	REST API exposure and rate limiting
-AWS Lambda: Serverless compute for risk scoring and access decisions
-Amazon SageMaker: Model training, deployment, and inference
-Amazon DynamoDB: User profiles and risk scores storage
-Amazon CloudWatch: System metrics, alarms, and dashboards
-AWS CloudTrail: API call logging and compliance
+1. Amazon Cognito:	Identity management and Authentication
+2. Amazon API Gateway:	REST API exposure and rate limiting
+3. AWS Lambda: Serverless compute for risk scoring and access decisions
+4. Amazon SageMaker: Model training, deployment, and inference
+5. Amazon DynamoDB: User profiles and risk scores storage
+6. Amazon CloudWatch: System metrics, alarms, and dashboards
+7. AWS CloudTrail: API call logging and compliance
 
 Dataset:
-Cloud Access Security Dataset (CASD)
-Source: Synthesized from public cloud security datasets and government access patterns
-Size: 50,000-10,000 records
-Features: 15 features (5 categorical, 7 numerical, 3 binary)
+*Cloud Access Security Dataset (CASD)
+*Source: Synthesized from public cloud security datasets and government access patterns
+*Size: 50,000-10,000 records
+*Features: 15 features (5 categorical, 7 numerical, 3 binary)
