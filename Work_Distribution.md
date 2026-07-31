@@ -2,7 +2,7 @@ Ashna Agarwal (24BIT0249):
 1. Machine Learning & Risk Scoring Engine
    
     Dataset Preparation
-        1. Research and identify appropriate public datasets
+        1. Research and identify appropriate public datasets\n
         2. Data collection and synthesis for government e-service access patterns
         3. Data preprocessing and feature engineering
         4. Data cleaning and normalization
