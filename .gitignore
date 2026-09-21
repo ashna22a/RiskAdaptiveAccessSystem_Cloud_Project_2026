@@ -1,10 +1,12 @@
 data/raw/
 data/processed/
+models/
 *.joblib
 *.pkl
 .env
 __pycache__/
+*.pyc
 .ipynb_checkpoints/
 .pytest_cache/
 *.tar.gz
-sagemaker/model_artifacts/
+sagemaker/best_tuning_job.txt
