@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Zero Trust Risk Demo</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>Zero Trust Access Recommendation Demo</h1>
+
+  <form id="assess-form">
+    <h2>User context</h2>
+    <label>User ID <input name="user_id" value="U00001"></label>
+    <label>Role
+      <select name="user_role">
+        <option value="citizen">citizen</option>
+        <option value="gov_employee">gov_employee</option>
+        <option value="admin">admin</option>
+      </select>
+    </label>
+    <label>Login location
+      <select name="login_location">
+        <option>Chennai</option><option>Mumbai</option><option>Delhi</option>
+        <option>Bangalore</option><option>Hyderabad</option>
+      </select>
+    </label>
+    <label>Hour (0–23) <input name="hour" type="number" value="10"></label>
+    <label>Failed attempts (24h) <input name="failed_attempts_24h" type="number" value="0"></label>
+    <label>Location distance km <input name="location_distance_km" type="number" value="0"></label>
+
+    <h2>Service context</h2>
+    <label>Service type
+      <select name="service_type">
+        <option>general_info</option>
+        <option>tax_filing</option>
+        <option>benefits_application</option>
+        <option>identity_verification</option>
+        <option>license_renewal</option>
+      </select>
+    </label>
+    <label>Department
+      <select name="department">
+        <option>general</option><option>finance</option>
+        <option>health</option><option>defense</option><option>education</option>
+      </select>
+    </label>
+
+    <button type="submit">Assess risk</button>
+  </form>
+
+  <h2>Decision</h2>
+  <pre id="result">—</pre>
+
+  <script>
+    const form = document.getElementById("assess-form");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const body = {
+        user_id: fd.get("user_id"),
+        user_context: {
+          user_role: fd.get("user_role"),
+          login_location: fd.get("login_location"),
+          hour: parseInt(fd.get("hour")),
+          failed_attempts_24h: parseInt(fd.get("failed_attempts_24h")),
+          location_distance_km: parseFloat(fd.get("location_distance_km")),
+        },
+        service_context: {
+          service_type: fd.get("service_type"),
+          department: fd.get("department"),
+        },
+      };
+      const res = await fetch("/api/assess", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+    });
+  </script>
+</body>
+</html>
