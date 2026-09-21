@@ -1,0 +1,10 @@
+data/raw/
+data/processed/
+*.joblib
+*.pkl
+.env
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+*.tar.gz
+sagemaker/model_artifacts/
