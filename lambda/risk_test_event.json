@@ -1,0 +1,22 @@
+{
+  "user_id": "USER001",
+  "user_context": {
+    "user_role": "citizen",
+    "access_method": "web_portal",
+    "device_type": "browser",
+    "login_frequency": 5,
+    "session_duration": 30,
+    "time_since_last_login": 120,
+    "location_distance_km": 10,
+    "access_count_7d": 8,
+    "failed_attempts_24h": 0,
+    "session_requests": 3,
+    "is_off_hours": 0,
+    "location_mismatch": 0,
+    "device_mismatch": 0
+  },
+  "service_context": {
+    "service_type": "tax_filing",
+    "department": "finance"
+  }
+}
