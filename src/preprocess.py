@@ -17,7 +17,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTE
 
-from config import (
+from src.config import (
     RAW_DATA_PATH,
     PROCESSED_DIR,
     MODEL_DIR,
