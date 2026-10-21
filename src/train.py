@@ -1,108 +1,63 @@
-"""SageMaker training entry point.
-Prints metric lines that the HyperparameterTuner regex matches."""
-
-import argparse
+# src/train.py
 import os
 import joblib
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, f1_score, classification_report
-
-from preprocessing import build_preprocessing_pipeline
-from config import (
-    CATEGORICAL_FEATURES,
-    NUMERICAL_FEATURES,
-    FEATURE_COLUMNS,
-    TARGET_COLUMN,
-    RANDOM_SEED,
+from sklearn.metrics import (
+    accuracy_score, f1_score, classification_report, confusion_matrix,
 )
 
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--train", type=str, default=os.environ.get("SM_CHANNEL_TRAIN"))
-    parser.add_argument(
-        "--validation", type=str, default=os.environ.get("SM_CHANNEL_VALIDATION")
-    )
-    parser.add_argument(
-        "--model-dir", type=str, default=os.environ.get("SM_MODEL_DIR", "models")
-    )
-    parser.add_argument("--n-estimators", type=int, default=100)
-    parser.add_argument("--max-depth", type=int, default=15)
-    parser.add_argument("--min-samples-leaf", type=int, default=5)
-    parser.add_argument("--max-features", type=str, default="sqrt")
-    return parser.parse_known_args()
+from config import TARGET_COLUMN
 
 
-def _parse_max_features(value):
-    """Coerce SageMaker's string hyperparameters into sklearn-valid values."""
-    if value in ("sqrt", "log2"):
-        return value
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return "sqrt"
+def train_model():
+    train_df = pd.read_csv("data/processed/train.csv")
+    val_df = pd.read_csv("data/processed/val.csv")
 
-
-def train(args):
-    train_path = os.path.join(args.train, "csad_train.csv")
-    val_path = os.path.join(args.validation, "csad_val.csv")
-
-    train_df = pd.read_csv(train_path)
-    val_df = pd.read_csv(val_path)
-
-    X_train = train_df[FEATURE_COLUMNS]
+    X_train = train_df.drop(columns=[TARGET_COLUMN])
     y_train = train_df[TARGET_COLUMN]
-    X_val = val_df[FEATURE_COLUMNS]
+    X_val = val_df.drop(columns=[TARGET_COLUMN])
     y_val = val_df[TARGET_COLUMN]
 
-    preprocessor = build_preprocessing_pipeline(
-        CATEGORICAL_FEATURES, NUMERICAL_FEATURES
-    )
-    X_train_p = preprocessor.fit_transform(X_train)
-    X_val_p = preprocessor.transform(X_val)
+    print(f"Training on {len(X_train)} samples, {X_train.shape[1]} features")
+    print(f"Validating on {len(X_val)} samples")
 
     rf = RandomForestClassifier(
-        n_estimators=args.n_estimators,
-        max_depth=args.max_depth,
-        min_samples_leaf=args.min_samples_leaf,
-        max_features=_parse_max_features(args.max_features),
+        n_estimators=300,
+        max_depth=None,          # Let trees grow — ZTA-RAD is small
+        min_samples_leaf=1,
+        max_features="sqrt",
         class_weight="balanced",
-        random_state=RANDOM_SEED,
+        random_state=42,
         n_jobs=-1,
     )
-    rf.fit(X_train_p, y_train)
+    rf.fit(X_train, y_train)
 
-    y_pred = rf.predict(X_val_p)
-    accuracy = accuracy_score(y_val, y_pred)
+    y_pred = rf.predict(X_val)
+    acc = accuracy_score(y_val, y_pred)
     f1 = f1_score(y_val, y_pred, average="weighted")
 
-    # --- These exact lines are parsed by the tuner regex ---
-    print(f"Validation Accuracy: {accuracy:.4f}")
+    print("\n" + "=" * 50)
+    print(f"Validation Accuracy: {acc:.4f}")
     print(f"Validation F1 (weighted): {f1:.4f}")
-    # -------------------------------------------------------
+    print("=" * 50)
+    print(classification_report(
+        y_val, y_pred,
+        target_names=["Allow", "Challenge MFA", "Deny"],
+        zero_division=0,
+    ))
+    print(f"Confusion Matrix:\n{confusion_matrix(y_val, y_pred)}")
 
-    print(
-        classification_report(
-            y_val, y_pred, target_names=["Allow", "Challenge MFA", "Deny"]
-        )
-    )
+    # Feature importances
+    print("\nTop 10 Features:")
+    importances = pd.Series(rf.feature_importances_, index=X_train.columns)
+    for name, imp in importances.nlargest(10).items():
+        print(f"  {name:40s} {imp:.4f}")
 
-    os.makedirs(args.model_dir, exist_ok=True)
-    joblib.dump(rf, os.path.join(args.model_dir, "random_forest.joblib"))
-    joblib.dump(preprocessor, os.path.join(args.model_dir, "preprocessor.joblib"))
+    os.makedirs("models", exist_ok=True)
+    joblib.dump(rf, "models/random_forest.joblib")
+    print("\nModel saved to models/random_forest.joblib")
 
 
-# src/train.py (add at the bottom, replacing the __main__ block)
 if __name__ == "__main__":
-    import sys
-    args, _ = parse_args()
-    # If SM_CHANNEL_TRAIN isn't set, assume the standard local layout
-    if args.train is None:
-        args.train = "data/processed"
-    if args.validation is None:
-        args.validation = "data/processed"
-    if args.model_dir is None or args.model_dir == "models":
-        args.model_dir = "models"
-    train(args)
-    print(f"\nSaved model artifacts to: {args.model_dir}/")
+    train_model()
