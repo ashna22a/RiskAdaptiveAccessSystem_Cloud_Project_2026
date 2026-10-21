@@ -1,45 +1,82 @@
-# Cloud Access Security Dataset (CSAD)
+# ZTA-RAD Dataset
 
-## Provenance
-Synthesized from public cloud security datasets and documented
-government e-service access patterns. Generation script: `src/synthesize_data.py`.
+This folder contains the raw and processed data used to train and evaluate the
+Zero Trust Cloud Access Recommendation System.
 
-## Files
-| File | Records | Purpose |
-|------|---------|---------|
-| raw/csad_full.csv | 50,000+ | Complete dataset before splitting |
-| processed/csad_train.csv | 70% | Model training |
-| processed/csad_val.csv | 15% | Hyperparameter tuning |
-| processed/csad_test.csv | 15% | Final evaluation (never seen during training) |
+The raw dataset is **not** committed to this repository. See "Getting the data"
+below to download it.
 
-## Schema (15 predictive features + metadata)
-| # | Feature | Type | Description |
-|---|---------|------|-------------|
-| 1 | user_role | categorical | citizen / gov_employee / admin |
-| 2 | service_type | categorical | e-service being accessed |
-| 3 | department | categorical | Department owning the service |
-| 4 | access_method | categorical | web_portal / mobile_app / api |
-| 5 | device_type | categorical | browser / mobile / tablet / desktop_client |
-| 6 | login_frequency | numerical | Logins in last 30 days |
-| 7 | session_duration | numerical | Seconds |
-| 8 | time_since_last_login | numerical | Hours |
-| 9 | location_distance_km | numerical | From usual location |
-| 10 | access_count_7d | numerical | Accesses in last 7 days |
-| 11 | failed_attempts_24h | numerical | Failed auth attempts |
-| 12 | session_requests | numerical | Requests in current session |
-| 13 | is_off_hours | binary | 1 if outside 6am–10pm |
-| 14 | location_mismatch | binary | 1 if login ≠ usual location |
-| 15 | device_mismatch | binary | 1 if device ≠ usual device |
+---
 
-**Target:** `risk_level` — 0 (Allow), 1 (Challenge MFA), 2 (Deny)
+## 1. Dataset Identity
 
-## Preprocessing Required
-1. Missing value imputation (median for numerical)
-2. Deduplication on (user_id, timestamp)
-3. Feature engineering (risk indicators)
-4. One-hot encoding of categoricals
-5. StandardScaler on numericals
-6. Class balancing via `class_weight='balanced'`
+| Attribute | Value |
+|-----------|-------|
+| **Name** | ZTA-RAD (Zero Trust Architecture — Risk Assessment Dataset) |
+| **Source** | Mendeley Data |
+| **Publisher** | Elsevier B.V. |
+| **DOI** | [10.17632/d6hvsrxdts](https://doi.org/10.17632/d6hvsrxdts) |
+| **Dataset URL** | https://data.mendeley.com/datasets/d6hvsrxdts/1 |
+| **Published** | 2 September 2025 |
+| **License** | See the "License" field on the Mendeley landing page before use |
+| **Original derivation** | Derived and expanded from the CERT Insider Threat Dataset |
 
-## License
-Academic use only.
+---
+
+## 2. Purpose in This Project
+
+ZTA-RAD provides labelled behavioural records of insider threat scenarios in
+cloud environments. We use it to train and evaluate a Random Forest classifier
+that predicts the access risk level (Low / Medium / High) for a given request.
+
+The task modelled here is **three-class classification**:
+
+| Class | ZTA-RAD label | Recommendation |
+|-------|---------------|----------------|
+| 0 | Baixo (Low) | ALLOW |
+| 1 | Médio (Medium) | CHALLENGE_MFA |
+| 2 | Alto (High) | DENY |
+
+---
+
+## 3. Dataset Structure
+
+The raw CSV (`zta_rad.csv`) contains **39 columns** spanning four categories:
+
+### Logon metrics (11 columns)
+`computadores_distintos`, `total_logons`, `total_logoffs`, `hora_logon_mais_comum`,
+`hora_logoff_mais_comum`, `logons_fim_de_semana`, `logons_dias_uteis`,
+`logons_fora_horario_comercial`, `logons_em_horario_comercial`,
+`logons_janela_acesso`, `proporcao_pc_mais_usado`
+
+### Device metrics (10 columns)
+`pcs_distintos_dispositivo`, `total_atividades_dispositivo`,
+`connect_fora_horario_comercial`, `connect_em_horario_comercial`,
+`connect_fim_de_semana`, `connect_dias_uteis`, `connect_janela_acesso`,
+`total_connect_dispositivo`, `total_disconnect_dispositivo`,
+`conexoes_sem_desconexao`
+
+### HTTP access metrics (12 columns)
+`sites_distintos_visitados`, `total_acessos_http`,
+`acessos_fora_horario_comercial`, `acessos_em_horario_comercial`,
+`acessos_fim_de_semana`, `acessos_janela_acesso`, `visita_sites_compras`,
+`visita_sites_noticias`, `visita_sites_entretenimento`, `tamanho_medio_urls`,
+`termos_sensiveis_detectados`, `tamanho_medio_conteudo`,
+`diferenca_acessos_fora_dentro`
+
+### Metadata (6 columns)
+`user` (anonymised ID), `computador_mais_usado` (anonymised device ID),
+`classe` (numeric class), `risco` (Portuguese label: Baixo/Médio/Alto),
+`sintetico` (1 if the row is synthetic, 0 if observed)
+
+---
+
+## 4. Getting the Data
+
+Because of the licensing terms on Mendeley Data, the raw CSV is **not**
+committed to this repository. To reproduce the pipeline:
+
+1. Visit https://data.mendeley.com/datasets/d6hvsrxdts/1
+2. Accept the license and download the CSV (typically named
+   `ZTA-RAD.csv` or `ZTA_RAD_dataset.csv`)
+3. Place it at:
