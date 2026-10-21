@@ -7,7 +7,7 @@ from sklearn.metrics import (
     accuracy_score, f1_score, classification_report, confusion_matrix,
 )
 
-from config import TARGET_COLUMN
+from src.config import TARGET_COLUMN
 
 
 def train_model():
