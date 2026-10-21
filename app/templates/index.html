@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Zero Trust Access Console</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <div class="header">
+    <h1>Zero Trust Access Console</h1>
+    <p>Risk-Adaptive Intelligence (ZTA-RAD Model)</p>
+  </div>
+
+  <div class="main-container">
+    
+    <!-- Left Side: Input -->
+    <div class="panel">
+      <h2>Access Request</h2>
+      
+      <div class="presets">
+        <p><strong>Scenario:</strong></p>
+        <button type="button" onclick="loadPreset('benign')">Benign Citizen</button>
+        <button type="button" onclick="loadPreset('critical')">Critical Service</button>
+        <button type="button" onclick="loadPreset('attack')">Suspicious Attack</button>
+      </div>
+
+      <form id="assessForm">
+        <label>User Role</label>
+        <select id="user_role">
+          <option value="citizen">Citizen</option>
+          <option value="gov_employee">Government Employee</option>
+        </select>
+
+        <label>Service Type</label>
+        <select id="service_type">
+          <option value="general_info">General Info</option>
+          <option value="tax_filing">Tax Filing (Critical)</option>
+        </select>
+
+        <label>Department</label>
+        <select id="department">
+          <option value="general">General</option>
+          <option value="finance">Finance</option>
+        </select>
+
+        <div class="row">
+          <div>
+            <label>Access Hour (0-23)</label>
+            <input type="number" id="hour" value="10" min="0" max="23">
+          </div>
+          <div>
+            <label>Distance (km)</label>
+            <input type="number" id="location_distance_km" value="5" min="0">
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Failed Attempts (24h)</label>
+            <input type="number" id="failed_attempts_24h" value="0" min="0">
+          </div>
+          <div>
+            <label>Logins (30d)</label>
+            <input type="number" id="login_frequency" value="12" min="0">
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">Assess Risk</button>
+      </form>
+    </div>
+
+    <!-- Right Side: Results -->
+    <div class="panel result-panel">
+      <h2>Decision Output</h2>
+      
+      <div id="idle-state">
+        <p>Submit a request to see the recommendation.</p>
+      </div>
+
+      <div id="result-state" class="hidden">
+        <h3 id="decisionText">--</h3>
+        <p id="reasonText">--</p>
+
+        <div class="metrics">
+          <div class="metric">
+            <span>Risk Score</span>
+            <strong id="riskScore">--</strong>
+          </div>
+          <div class="metric">
+            <span>Source</span>
+            <strong id="decisionSource">--</strong>
+          </div>
+        </div>
+
+        <h4>Model Probabilities</h4>
+        <div class="bar-container">
+          <div class="bar-label">Allow</div>
+          <div class="bar-track"><div class="bar-fill allow" id="bar-allow" style="width: 0%"></div></div>
+        </div>
+        <div class="bar-container">
+          <div class="bar-label">Challenge</div>
+          <div class="bar-track"><div class="bar-fill challenge" id="bar-challenge" style="width: 0%"></div></div>
+        </div>
+        <div class="bar-container">
+          <div class="bar-label">Deny</div>
+          <div class="bar-track"><div class="bar-fill deny" id="bar-deny" style="width: 0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+
+      // Exact ZTA-RAD feature profiles from the dataset
+      const presets = {
+        benign: {
+          user_role: "citizen",
+          service_type: "general_info",
+          department: "general",
+          hour: 10,
+          location_distance_km: 5,
+          failed_attempts_24h: 0,
+          login_frequency: 7,
+          // EXACT DATASET ROW (BAIXO)
+          computadores_distintos: 0.0,
+          total_logons: 7.0,
+          total_logoffs: 0.0,
+          hora_logon_mais_comum: 3.0,
+          hora_logoff_mais_comum: 6.0,
+          logons_fim_de_semana: 0.0,
+          logons_dias_uteis: 7.0,
+          logons_fora_horario_comercial: 0.0,
+          logons_em_horario_comercial: 15.0,
+          logons_janela_acesso: 0.0,
+          proporcao_pc_mais_usado: 327.0,
+          pcs_distintos_dispositivo: 1.0,
+          total_atividades_dispositivo: 351.0,
+          connect_fora_horario_comercial: 99.0,
+          connect_em_horario_comercial: 312.0,
+          connect_fim_de_semana: 116.0,
+          connect_dias_uteis: 305.0,
+          connect_janela_acesso: 64.0,
+          total_connect_dispositivo: 351.0,
+          total_disconnect_dispositivo: 290.0,
+          conexoes_sem_desconexao: 302.0,
+          sites_distintos_visitados: 514.0,
+          total_acessos_http: 778.0,
+          acessos_fora_horario_comercial: 104.0,
+          acessos_em_horario_comercial: 783.0,
+          acessos_fim_de_semana: 101.0,
+          acessos_janela_acesso: 82.0,
+          visita_sites_compras: 58.0,
+          visita_sites_noticias: 109.0,
+          visita_sites_entretenimento: 323.0,
+          tamanho_medio_urls: 993.0,
+          termos_sensiveis_detectados: 6.0,
+          tamanho_medio_conteudo: 999.0,
+          diferenca_acessos_fora_dentro: 778.0
+        },
+        critical: {
+          user_role: "citizen",
+          service_type: "tax_filing",
+          department: "finance",
+          hour: 14,
+          location_distance_km: 8,
+          failed_attempts_24h: 0,
+          login_frequency: 67,
+          // EXACT DATASET ROW (MÉDIO)
+          computadores_distintos: 0.0,
+          total_logons: 67.0,
+          total_logoffs: 75.0,
+          hora_logon_mais_comum: 1.0,
+          hora_logoff_mais_comum: 2.0,
+          logons_fim_de_semana: 0.0,
+          logons_dias_uteis: 65.0,
+          logons_fora_horario_comercial: 0.0,
+          logons_em_horario_comercial: 91.0,
+          logons_janela_acesso: 0.0,
+          proporcao_pc_mais_usado: 327.0,
+          pcs_distintos_dispositivo: 1.0,
+          total_atividades_dispositivo: 351.0,
+          connect_fora_horario_comercial: 99.0,
+          connect_em_horario_comercial: 312.0,
+          connect_fim_de_semana: 116.0,
+          connect_dias_uteis: 305.0,
+          connect_janela_acesso: 64.0,
+          total_connect_dispositivo: 351.0,
+          total_disconnect_dispositivo: 290.0,
+          conexoes_sem_desconexao: 302.0,
+          sites_distintos_visitados: 194.0,
+          total_acessos_http: 483.0,
+          acessos_fora_horario_comercial: 0.0,
+          acessos_em_horario_comercial: 489.0,
+          acessos_fim_de_semana: 0.0,
+          acessos_janela_acesso: 0.0,
+          visita_sites_compras: 5.0,
+          visita_sites_noticias: 31.0,
+          visita_sites_entretenimento: 192.0,
+          tamanho_medio_urls: 931.0,
+          termos_sensiveis_detectados: 2.0,
+          tamanho_medio_conteudo: 585.0,
+          diferenca_acessos_fora_dentro: 292.0
+        },
+        attack: {
+          user_role: "gov_employee",
+          service_type: "tax_filing",
+          department: "finance",
+          hour: 3,
+          location_distance_km: 1200,
+          failed_attempts_24h: 6,
+          login_frequency: 199,
+          // EXACT DATASET ROW (ALTO)
+          computadores_distintos: 1.0,
+          total_logons: 199.0,
+          total_logoffs: 111.0,
+          hora_logon_mais_comum: 1.0,
+          hora_logoff_mais_comum: 2.0,
+          logons_fim_de_semana: 0.0,
+          logons_dias_uteis: 178.0,
+          logons_fora_horario_comercial: 81.0,
+          logons_em_horario_comercial: 177.0,
+          logons_janela_acesso: 0.0,
+          proporcao_pc_mais_usado: 287.0,
+          pcs_distintos_dispositivo: 1.0,
+          total_atividades_dispositivo: 351.0,
+          connect_fora_horario_comercial: 99.0,
+          connect_em_horario_comercial: 312.0,
+          connect_fim_de_semana: 116.0,
+          connect_dias_uteis: 305.0,
+          connect_janela_acesso: 64.0,
+          total_connect_dispositivo: 351.0,
+          total_disconnect_dispositivo: 290.0,
+          conexoes_sem_desconexao: 302.0,
+          sites_distintos_visitados: 49.0,
+          total_acessos_http: 44.0,
+          acessos_fora_horario_comercial: 1.0,
+          acessos_em_horario_comercial: 45.0,
+          acessos_fim_de_semana: 0.0,
+          acessos_janela_acesso: 0.0,
+          visita_sites_compras: 2.0,
+          visita_sites_noticias: 2.0,
+          visita_sites_entretenimento: 6.0,
+          tamanho_medio_urls: 726.0,
+          termos_sensiveis_detectados: 1.0,
+          tamanho_medio_conteudo: 955.0,
+          diferenca_acessos_fora_dentro: 731.0
+        }
+      };
+
+      window.loadPreset = function(name) {
+        const p = presets[name];
+        document.getElementById('user_role').value = p.user_role;
+        document.getElementById('service_type').value = p.service_type;
+        document.getElementById('department').value = p.department;
+        document.getElementById('hour').value = p.hour;
+        document.getElementById('location_distance_km').value = p.location_distance_km;
+        document.getElementById('failed_attempts_24h').value = p.failed_attempts_24h;
+        document.getElementById('login_frequency').value = p.login_frequency;
+        
+        // Store the full profile so we can attach it to the next submit
+        window.currentPreset = p;
+      };
+
+      // Load benign preset on page load
+      loadPreset('benign');
+
+      const form = document.getElementById('assessForm');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.innerText = "Assessing...";
+        btn.disabled = true;
+
+        const payload = {
+          user_role: document.getElementById('user_role').value,
+          service_type: document.getElementById('service_type').value,
+          department: document.getElementById('department').value,
+          hour: parseInt(document.getElementById('hour').value),
+          location_distance_km: parseFloat(document.getElementById('location_distance_km').value),
+          failed_attempts_24h: parseInt(document.getElementById('failed_attempts_24h').value),
+          login_frequency: parseInt(document.getElementById('login_frequency').value),
+        };
+
+        // If a preset is loaded, include its full ZTA-RAD features
+        if (window.currentPreset) {
+          Object.assign(payload, window.currentPreset);
+          // Re-apply form values in case user changed them
+          payload.hour = parseInt(document.getElementById('hour').value);
+          payload.location_distance_km = parseFloat(document.getElementById('location_distance_km').value);
+          payload.failed_attempts_24h = parseInt(document.getElementById('failed_attempts_24h').value);
+        }
+
+        try {
+          const res = await fetch('/api/assess', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) throw new Error(`Server returned ${res.status}`);
+          const data = await res.json();
+
+          document.getElementById('idle-state').classList.add('hidden');
+          document.getElementById('result-state').classList.remove('hidden');
+
+          const decisionText = document.getElementById('decisionText');
+          decisionText.innerText = data.recommendation;
+          decisionText.className = "";
+          if (data.recommendation === "ALLOW") decisionText.classList.add("text-allow");
+          else if (data.recommendation === "CHALLENGE_MFA") decisionText.classList.add("text-challenge");
+          else decisionText.classList.add("text-deny");
+
+          document.getElementById('reasonText').innerText = data.reason;
+          document.getElementById('riskScore').innerText = data.risk_score;
+          document.getElementById('decisionSource').innerText = data.source;
+
+          if (data.probabilities) {
+            document.getElementById('bar-allow').style.width = (data.probabilities.allow * 100) + "%";
+            document.getElementById('bar-challenge').style.width = (data.probabilities.challenge * 100) + "%";
+            document.getElementById('bar-deny').style.width = (data.probabilities.deny * 100) + "%";
+          }          
+
+        } catch (err) {
+          console.error(err);
+          alert("Error: " + err.message);
+        } finally {
+          btn.innerText = "Assess Risk";
+          btn.disabled = false;
+        }
+      });
+    });
+  </script>
+</body>
+</html>
