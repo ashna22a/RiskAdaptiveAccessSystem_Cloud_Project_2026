@@ -1,0 +1,48 @@
+name: Test and deploy Lambdas
+
+on:
+  push:
+    branches: [Krithikha-24BIT0545]
+    paths:
+      - "aws-infra/**"
+      - ".github/workflows/deploy-lambdas.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Syntax check
+        run: python -m py_compile aws-infra/lambdas/*/lambda_function.py
+      - name: Rule tests
+        run: python -m unittest discover -s aws-infra/tests -v
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::996241421261:role/GitHubActionsLambdaDeploy
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy functions
+        run: |
+          deploy() {
+            (cd "aws-infra/lambdas/$1" && zip -q "$GITHUB_WORKSPACE/$1.zip" lambda_function.py)
+            aws lambda update-function-code --function-name "$2" --zip-file "fileb://$1.zip"
+            aws lambda wait function-updated --function-name "$2"
+          }
+          deploy access_request ZeroTrustAccessRequest
+          deploy recommendation ZeroTrustRecommendation
+          deploy post_confirmation ZeroTrustPostConfirmation
