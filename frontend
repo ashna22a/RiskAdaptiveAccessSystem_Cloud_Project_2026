@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Government e-Services access</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#2b3a52;--panel:#41436a;--panel-2:#363a5c;--mauve:#984063;--coral:#f64668;--peach:#fe9677;--ink:#fff;--muted:#d3d3e6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 Inter,system-ui,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:48px 20px 64px;display:grid;gap:32px;grid-template-columns:1fr}
+@media(min-width:820px){.wrap{grid-template-columns:5fr 7fr;align-items:start;padding-top:80px}.side{position:sticky;top:48px}}
+.mark{display:flex;margin-bottom:28px}
+.mark i{width:34px;height:34px;border-radius:50%;margin-right:-10px;display:block}
+h1{font:800 34px/1.15 Inter,sans-serif;margin:0 0 12px;letter-spacing:-.01em}
+.lead{color:var(--muted);margin:0 0 24px;max-width:34ch}
+.who{color:var(--muted);margin:0 0 12px;word-break:break-all}
+.card{background:var(--panel);border-radius:10px;padding:28px}
+label{display:block;font-weight:600;margin:18px 0 6px}
+label:first-of-type{margin-top:0} 
+select,input{width:100%;padding:11px 12px;font:inherit;color:var(--ink);background:var(--panel-2);border:1px solid var(--mauve);border-radius:6px}
+select option{background:var(--panel-2)} 
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+details{margin-top:24px;border-top:1px solid var(--mauve);padding-top:16px}
+summary{cursor:pointer;font-weight:600;color:var(--peach)}
+details p{color:var(--muted);margin:8px 0 0;font-size:14px}
+button{font:800 18px Inter,sans-serif;padding:12px 24px;border-radius:6px;border:2px solid var(--peach);background:var(--peach);color:var(--bg);cursor:pointer}
+button.quiet{background:transparent;color:var(--peach);font:600 16px Inter,sans-serif;padding:8px 16px}
+button:disabled{opacity:.6;cursor:wait}
+:focus-visible{outline:3px solid var(--coral);outline-offset:3px}
+.go{margin-top:24px}
+#result{margin-top:20px;padding:20px 24px;background:var(--panel);border-radius:10px;border-left:10px solid var(--peach)}
+#result h2{font:800 24px/1.2 Inter,sans-serif;margin:0 0 6px}
+#result p{margin:2px 0;color:var(--muted)}
+#result.CHALLENGE_MFA{border-left-color:var(--mauve)}
+#result.DENY,#result.ERROR{border-left-color:var(--coral)}
+#result.DENY h2,#result.ERROR h2{color:var(--coral)}
+#error{margin-top:16px;color:var(--peach);font-weight:600}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="side">
+    <div class="mark" aria-hidden="true"><i style="background:#41436a"></i><i style="background:#984063"></i><i style="background:#f64668"></i><i style="background:#fe9677"></i></div>
+    <h1>Request access to a government service</h1>
+    <p class="lead">Every request is checked against your account and the risk of the action before it goes ahead.</p>
+    <div id="session" hidden>
+      <p class="who">Signed in as <strong id="who"></strong></p>
+      <button class="quiet" id="logoutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="signedOut" class="card" hidden>
+      <p style="margin-top:0">Sign in with your account and authenticator code to continue.</p>
+      <button id="loginBtn">Sign in</button>
+      <button class="quiet" id="signupBtn">Create an account</button>
+    </section>
+
+    <section id="signedIn" hidden>
+      <form id="form" class="card">
+        <label for="service">Service</label>
+        <select id="service">
+          <option value="tax-filing" data-dept="finance">Tax filing</option>
+          <option value="benefits-application" data-dept="finance">Benefits application</option>
+          <option value="identity-verification" data-dept="general">Identity verification</option>
+          <option value="health-records" data-dept="health">Health records</option>
+          <option value="general-info" data-dept="general">Public information</option>
+        </select>
+        <label for="action">What do you want to do?</label>
+        <select id="action"><option value="view">View</option><option value="submit">Submit</option><option value="update">Update</option></select>
+
+        <details>
+          <summary>Simulate risk signals (demo only)</summary>
+          <p>A live system works these out from sign-in history and IP location. Set them here to try each outcome.</p>
+          <div class="row">
+            <div><label for="fails">Failed sign-ins in 24 hours</label><input id="fails" type="number" min="0" value="0"></div>
+            <div><label for="dist">Distance from usual location (km)</label><input id="dist" type="number" min="0" value="0"></div>
+          </div>
+        </details>
+        <div class="go"><button type="submit" id="submitBtn">Check access</button></div>
+      </form>
+      <div id="result" hidden role="status"></div>
+    </section>
+    <div id="error" hidden role="alert"></div>
+  </main>
+</div>
+
+<script>
+const CFG = {
+  domain: "https://ap-south-1fxeqkw2mk.auth.ap-south-1.amazoncognito.com",
+  clientId: "2u77ej0libou72itu5b9urhepa",
+  redirect: "http://localhost:3000",
+  api: "https://ad1ohst19f.execute-api.ap-south-1.amazonaws.com/dev/access/request"
+};
+const $ = id => document.getElementById(id);
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const rand = () => b64url(crypto.getRandomValues(new Uint8Array(32)));
+const showError = m => { $("error").textContent = m; $("error").hidden = !m; };
+
+async function login(page = "oauth2/authorize") {
+  const verifier = rand(), state = rand();
+  sessionStorage.setItem("pkce_verifier", verifier);
+  sessionStorage.setItem("pkce_state", state);
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  location.href = CFG.domain + "/" + page + "?" + new URLSearchParams({
+    client_id: CFG.clientId, response_type: "code", scope: "openid email phone",
+    redirect_uri: CFG.redirect, code_challenge: challenge, code_challenge_method: "S256", state
+  });
+}
+
+async function tokenRequest(params) {
+  const res = await fetch(CFG.domain + "/oauth2/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: CFG.clientId, ...params })
+  });
+  if (!res.ok) throw new Error("token request failed");
+  return res.json();
+}
+
+function saveTokens(t) {
+  sessionStorage.setItem("id_token", t.id_token);
+  if (t.refresh_token) sessionStorage.setItem("refresh_token", t.refresh_token);
+}
+
+async function handleRedirect() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has("code")) return;
+  history.replaceState({}, "", location.pathname);
+  if (q.get("state") !== sessionStorage.getItem("pkce_state")) {
+    showError("We could not verify that sign-in. Select Sign in to try again.");
+    return;
+  }
+  try {
+    saveTokens(await tokenRequest({
+      grant_type: "authorization_code", code: q.get("code"),
+      redirect_uri: CFG.redirect, code_verifier: sessionStorage.getItem("pkce_verifier")
+    }));
+  } catch {
+    showError("Sign-in did not finish. Select Sign in to try again.");
+  }
+}
+
+function claims() {
+  const t = sessionStorage.getItem("id_token");
+  if (!t) return null;
+  try { return JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); }
+  catch { return null; }
+}
+
+async function refresh() {
+  const rt = sessionStorage.getItem("refresh_token");
+  if (!rt) return false;
+  try { saveTokens(await tokenRequest({ grant_type: "refresh_token", refresh_token: rt })); return true; }
+  catch { return false; }
+}
+
+async function callApi(body, retry = true) {
+  const res = await fetch(CFG.api, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: sessionStorage.getItem("id_token") },
+    body: JSON.stringify(body)
+  });
+  if (res.status === 401 && retry && await refresh()) return callApi(body, false);
+  return res;
+}
+
+function logout() {
+  sessionStorage.clear();
+  location.href = CFG.domain + "/logout?" + new URLSearchParams({ client_id: CFG.clientId, logout_uri: CFG.redirect });
+}
+
+const TITLES = {
+  ALLOW: "Access allowed",
+  CHALLENGE_MFA: "Additional verification required",
+  DENY: "Access denied"
+};
+
+function show(kind, title, lines) {
+  const r = $("result");
+  r.className = kind;
+  r.replaceChildren();
+  const h = document.createElement("h2"); h.textContent = title; r.append(h);
+  lines.forEach(t => { const p = document.createElement("p"); p.textContent = t; r.append(p); });
+  r.hidden = false;
+}
+
+$("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  showError("");
+  $("submitBtn").disabled = true;
+  try {
+    const opt = $("service").selectedOptions[0];
+    const res = await callApi({
+      service: opt.value,
+      action: $("action").value,
+      department: opt.dataset.dept,
+      failed_attempts_24h: Number($("fails").value) || 0,
+      location_distance_km: Number($("dist").value) || 0
+    });
+    if (res.status === 401) {
+      showError("Your session has ended. Sign in again to continue.");
+      sessionStorage.clear(); render();
+    } else {
+      const d = await res.json();
+      if (d.decision) {
+        show(d.decision, TITLES[d.decision] || d.decision,
+          [d.reason || d.error || "", "Decision: " + d.decision + (d.source ? " (from " + d.source + ")" : "")]);
+      } else {
+        show("ERROR", "Request not completed", [d.error || "The service returned an unexpected response."]);
+      }
+    }
+  } catch {
+    show("ERROR", "Could not reach the service", ["Check your connection, and that this page is open at " + CFG.redirect + "."]);
+  } finally {
+    $("submitBtn").disabled = false;
+  }
+});
+
+function render() {
+  const c = claims();
+  $("signedIn").hidden = !c;
+  $("signedOut").hidden = !!c;
+  $("session").hidden = !c;
+  if (c) $("who").textContent = c.email || c["cognito:username"] || c.sub;
+}
+
+$("loginBtn").addEventListener("click", () => login());
+$("signupBtn").addEventListener("click", () => login("signup"));
+$("logoutBtn").addEventListener("click", logout);
+handleRedirect().then(render);
+</script>
+</body>
+</html>
